@@ -1,0 +1,38 @@
+Cobertura 2026-01-01 2026-11-11 315 días
+                   metrica      fecha        valor porcentaje_acumulado
+           visualizaciones 2026-08-26 9.112160e+05                12.51
+              espectadores 2026-08-26 5.433780e+05                12.12
+             interacciones 2026-08-26 6.413400e+04                17.09
+                   visitas 2026-08-26 3.498000e+03                 9.43
+ seguidores_metrica_diaria 2026-08-26 2.398000e+03                18.39
+      ingresos_aproximados 2026-08-26 5.230048e+00                16.82
+ dias_cero_iniciales
+                  97
+                  97
+                  98
+                  97
+                  97
+                 124
+
+Rupturas de nivel en log(1 + visualizaciones)
+ penalizacion      desde      hasta mediana
+            8 2026-04-08 2026-05-03  1784.5
+            8 2026-05-04 2026-05-30  7402.0
+            8 2026-05-31 2026-10-02 30957.0
+            8 2026-10-03 2026-11-11 13495.0
+ penalizacion      desde      hasta mediana
+           12 2026-04-08 2026-05-30    2255
+           12 2026-05-31 2026-10-02   30957
+           12 2026-10-03 2026-11-11   13495
+ penalizacion      desde      hasta mediana
+           16 2026-04-08 2026-05-28    2214
+           16 2026-05-29 2026-11-11   25017
+Rupturas con penalización 12 y pico sustituido: 2026-04-08 2026-05-31 2026-10-03 
+
+STL semanal robusto en escala logarítmica
+visualizaciones fuerza=0.008 r7=-0.016 r7_sin_pico=-0.021
+espectadores fuerza=0.006 r7=-0.020 r7_sin_pico=-0.028
+interacciones fuerza=0.003 r7=-0.020 r7_sin_pico=-0.031
+visitas fuerza=0.000 r7=-0.007 r7_sin_pico=-0.005
+seguidores_metrica_diaria fuerza=0.000 r7=0.063 r7_sin_pico=0.081
+ingresos_aproximados fuerza=0.002 r7=-0.078 r7_sin_pico=-0.108

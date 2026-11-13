@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="es">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mapper de videos | Tsuchiori</title>
+<style>
+:root { font-family: system-ui, sans-serif; color: #20293a; background: #f3f6fa }
+body { margin: 0 }
+main { max-width: 1040px; margin: auto; padding: 30px 18px }
+h1,h2 { margin: 0 0 10px }
+p { line-height: 1.5 }
+section { background: white; padding: 20px; border-radius: 12px; margin: 16px 0; overflow: auto }
+select { max-width: 100%; font: inherit; padding: 6px }
+#viewport { overflow: auto }
+#graph { position: relative }
+canvas { position: absolute; inset: 0 }
+.node { position: absolute; transform: translate(-50%,-50%); border-radius: 50%; background: #def0fb; color: #173b61; border: 2px solid #3577ab; min-width: 36px; min-height: 36px; font-weight: 700; cursor: pointer }
+.node[aria-pressed=true] { background: #174e79; color: white }
+table { border-collapse: collapse; width: 100%; white-space: nowrap; font-size: 14px }
+th,td { text-align: left; padding: 9px; border-bottom: 1px solid #dce5ef }
+small { color: #40566b }
+</style>
+<main>
+<h1>Mapper de videos de Tsuchiori</h1>
+<p>Cada video se representa por la distribución de la métrica seleccionada en los días 0 a 6. El día de publicación puede ser parcial.</p>
+<section aria-labelledby="graph-title">
+<h2 id="graph-title">Grafo Mapper</h2>
+<label for="metric">Métrica</label>
+<select id="metric"></select>
+<label for="lens">Lente</label>
+<select id="lens">
+<option value="early">Proporción en los días 0 y 1</option>
+<option value="age">Día promedio ponderado</option>
+</select>
+<label for="config">Configuración</label>
+<select id="config"></select>
+<p id="counts"></p>
+<p><small><span id="lens-description"></span> Los intervalos ordenan la lente de menor a mayor. El número dentro de cada nodo indica cuántos videos contiene. Una arista indica videos compartidos.</small></p>
+<div id="viewport"><div id="graph"></div></div>
+</section>
+<section>
+<h2 id="node-title">Videos del nodo</h2>
+<p id="node-summary" aria-live="polite"></p>
+<table>
+<thead><tr><th>ID del video</th><th>Publicación</th><th>Total de 7 días</th><th id="lens-header">Valor de la lente</th><th>Valores diarios (0 a 6)</th></tr></thead>
+<tbody id="members"></tbody>
+</table>
+</section>
+<details><summary>Videos excluidos</summary><ul id="excluded"></ul></details>
+</main>
+<script id="data" type="application/json">__DATOS__</script>
+<script>
+const metrics = JSON.parse(document.querySelector('#data').textContent).metricas
+const metric = document.querySelector('#metric')
+let data = metrics[0]
+const lens = document.querySelector('#lens')
+const config = document.querySelector('#config')
+const graphArea = document.querySelector('#graph')
+const integer = new Intl.NumberFormat('es-MX', {maximumFractionDigits:3})
+const percent = new Intl.NumberFormat('es-MX', {style:'percent', maximumFractionDigits:1})
+
+metrics.forEach((result, i) => metric.add(new Option(result.metrica, i)))
+for (const [index, graph] of data.grafos.entries()) {
+  const label = `${graph.intervalos} intervalos · ${percent.format(graph.solapamiento)} de solapamiento · radio ${graph.radio}`
+  config.add(new Option(index === 0 ? label + ' (inicial)' : label, index))
+}
+function formatLens(value) {
+  return lens.value === 'age' ? integer.format(value) + ' días' : percent.format(value)
+}
+function showNode(graph, index) {
+  const node = graph.nodos[index]
+  graphArea.querySelectorAll('button').forEach((button, i) => button.setAttribute('aria-pressed', i === index))
+  document.querySelector('#node-title').textContent = `Nodo ${index + 1} · intervalo ${node.intervalo}`
+  document.querySelector('#node-summary').textContent = `${node.videos.length} videos en el intervalo ${node.limites.map(formatLens).join(' a ')} de la lente.`
+  const body = document.querySelector('#members')
+  body.replaceChildren()
+  for (const id of node.videos) {
+    const video = data.videos[id]
+    const row = body.insertRow()
+    for (const value of [video.id, video.publicacion.replace('T', ' '), integer.format(video.total),
+                         formatLens(video.lente), video.curva.map(x => integer.format(x)).join(' · ')]) {
+      row.insertCell().textContent = value
+    }
+  }
+}
+function draw() {
+  const selected = metrics[Number(metric.value)]
+  const age = lens.value === 'age'
+  data = age ? selected.por_edad : selected
+  document.querySelector('#lens-description').textContent = age
+    ? 'Cada día se pondera por la proporción del total semanal que recibió.'
+    : 'La lente es la proporción del total semanal registrada en los días 0 y 1.'
+  document.querySelector('#lens-header').textContent = age ? 'Día promedio ponderado' : 'Proporción en días 0 y 1'
+  const excluded = document.querySelector('#excluded')
+  excluded.replaceChildren()
+  for (const video of data.excluidos) {
+    const item = document.createElement('li')
+    item.textContent = `${video.id} · ${video.motivo}`
+    excluded.append(item)
+  }
+  const graph = data.grafos[Number(config.value)]
+  if (!graph) {
+    graphArea.replaceChildren()
+    document.querySelector('#counts').textContent = 'Sin videos elegibles'
+    document.querySelector('#node-title').textContent = 'Videos del nodo'
+    document.querySelector('#node-summary').textContent = ''
+    document.querySelector('#members').replaceChildren()
+    return
+  }
+  document.querySelector('#counts').textContent = `${data.videos.length} videos incluidos · ${graph.nodos.length} nodos · ${graph.aristas.length} aristas`
+  const columns = Array.from({length: graph.intervalos}, () => [])
+  graph.nodos.forEach((node, i) => columns[node.intervalo - 1].push(i))
+  const width = graph.intervalos * 138
+  const height = 64 + Math.max(...columns.map(column => column.length)) * 54
+  const positions = []
+  columns.forEach((column, i) => column.forEach((node, j) => {
+    positions[node] = [69 + 138 * i, 55 + 54 * j]
+  }))
+  const canvas = document.createElement('canvas')
+  canvas.width = width
+  canvas.height = height
+  canvas.setAttribute('aria-hidden', 'true')
+  graphArea.replaceChildren(canvas)
+  graphArea.style.width = width + 'px'
+  graphArea.style.height = height + 'px'
+  const context = canvas.getContext('2d')
+  context.font = '13px system-ui'
+  context.fillStyle = '#40566b'
+  context.textAlign = 'center'
+  columns.forEach((_, i) => context.fillText(`Intervalo ${i + 1}`, 69 + 138 * i, 18))
+  context.strokeStyle = '#7f9ab1'
+  for (const edge of graph.aristas) {
+    context.lineWidth = Math.min(5, 1 + edge.videos.length)
+    context.beginPath()
+    context.moveTo(...positions[edge.a])
+    context.lineTo(...positions[edge.b])
+    context.stroke()
+  }
+  graph.nodos.forEach((node, index) => {
+    const button = document.createElement('button')
+    button.className = 'node'
+    button.textContent = node.videos.length
+    button.setAttribute('aria-label', `Nodo ${index + 1}, ${node.videos.length} videos`)
+    button.style.left = positions[index][0] + 'px'
+    button.style.top = positions[index][1] + 'px'
+    button.onclick = () => showNode(graph, index)
+    graphArea.append(button)
+  })
+  showNode(graph, graph.nodos.reduce((best, node, i) => node.videos.length > graph.nodos[best].videos.length ? i : best, 0))
+}
+metric.onchange = draw
+lens.onchange = draw
+config.onchange = draw
+draw()
+</script>
+</html>
